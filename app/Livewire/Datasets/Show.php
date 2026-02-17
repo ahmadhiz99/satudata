@@ -17,9 +17,9 @@ class Show extends Component
     use WithPagination;
 
     public Dataset $dataset;
-    public $activeTab = 'tabel';
-    public $filterKabupaten = '';
-    public $filterTahun = '';
+    public $activeTab    = 'tabel';
+    public $filterKecamatan = '';   // ← ganti dari filterKabupaten
+    public $filterTahun  = '';
 
     public function mount(Dataset $dataset)
     {
@@ -32,92 +32,87 @@ class Show extends Component
         $this->resetPage();
 
         if ($tab === 'grafik') $this->dispatchChartEvent();
-        if ($tab === 'peta') $this->dispatchMapEvent();
+        if ($tab === 'peta')   $this->dispatchMapEvent();
     }
 
-    public function updatedFilterKabupaten()
+    public function updatedFilterKecamatan()
     {
         $this->resetPage();
         if ($this->activeTab === 'grafik') $this->dispatchChartEvent();
-        if ($this->activeTab === 'peta') $this->dispatchMapEvent();
+        if ($this->activeTab === 'peta')   $this->dispatchMapEvent();
     }
 
     public function updatedFilterTahun()
     {
         $this->resetPage();
         if ($this->activeTab === 'grafik') $this->dispatchChartEvent();
-        if ($this->activeTab === 'peta') $this->dispatchMapEvent();
+        if ($this->activeTab === 'peta')   $this->dispatchMapEvent();
     }
 
-    // ✅ BARU: Download Excel dengan filter aktif
+    // ─────────────────────────────────────────────────────────────
+    // Download Excel (ikut filter aktif)
+    // ─────────────────────────────────────────────────────────────
     public function downloadExcel(): StreamedResponse
     {
-        $query = $this->dataset->records();
-
-        if ($this->filterKabupaten) {
-            $query->where('kabupaten_kota', $this->filterKabupaten);
-        }
-        if ($this->filterTahun) {
-            $query->where('tahun', $this->filterTahun);
-        }
-
-        $data = $query->orderBy('kabupaten_kota')->orderBy('tahun')->get();
+        $data = $this->dataset->records()
+            ->when($this->filterKecamatan, fn($q) => $q->where('kabupaten_kota', $this->filterKecamatan))
+            ->when($this->filterTahun,     fn($q) => $q->where('tahun', $this->filterTahun))
+            ->orderBy('kabupaten_kota')
+            ->orderBy('tahun')
+            ->get();
 
         $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
+        $sheet       = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Data');
 
-        // ── Judul utama ──
-        $totalCols = count($this->dataset->columns) + 3; // kabupaten + kode + tahun + columns
-        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($totalCols);
+        $totalCols = count($this->dataset->columns) + 3; // kecamatan + kode + tahun + kolom data
+        $lastCol   = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($totalCols);
 
+        // ── Baris 1: Judul dataset ──
         $sheet->mergeCells("A1:{$lastCol}1");
-        $sheet->setCellValue('A1', $this->dataset->title);
+        $sheet->setCellValue('A1', $this->dataset->title . ' — Kabupaten Barito Utara');
         $sheet->getStyle('A1')->applyFromArray([
-            'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => 'FFFFFF']],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'B91C1C']],
+            'font'      => ['bold' => true, 'size' => 14, 'color' => ['rgb' => 'FFFFFF']],
+            'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'B91C1C']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ]);
         $sheet->getRowDimension(1)->setRowHeight(28);
 
-        // ── Sub-judul filter ──
+        // ── Baris 2: Info filter ──
         $filterParts = [];
-        if ($this->filterKabupaten) $filterParts[] = $this->filterKabupaten;
-        if ($this->filterTahun)     $filterParts[] = 'Tahun ' . $this->filterTahun;
-        $filterText = $filterParts ? implode(' | ', $filterParts) : 'Semua Data';
+        if ($this->filterKecamatan) $filterParts[] = 'Kecamatan: ' . $this->filterKecamatan;
+        if ($this->filterTahun)     $filterParts[] = 'Tahun: ' . $this->filterTahun;
+        $filterText = $filterParts ? implode(' | ', $filterParts) : 'Semua Kecamatan — Semua Tahun';
 
         $sheet->mergeCells("A2:{$lastCol}2");
         $sheet->setCellValue('A2', $filterText);
         $sheet->getStyle('A2')->applyFromArray([
-            'font' => ['italic' => true, 'size' => 10, 'color' => ['rgb' => '6B7280']],
+            'font'      => ['italic' => true, 'size' => 10, 'color' => ['rgb' => '6B7280']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ]);
 
-        // ── Header tabel ──
-        $headers = ['Kabupaten/Kota', 'Kode', 'Tahun'];
+        // ── Baris 3: Header kolom ──
+        $headers = ['Kecamatan', 'Kode', 'Tahun'];
         foreach ($this->dataset->columns as $label) {
             $headers[] = $label . ' (' . $this->dataset->unit . ')';
         }
 
-        $col = 1;
-        foreach ($headers as $header) {
-            $cell = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col) . '3';
+        foreach ($headers as $i => $header) {
+            $cell = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i + 1) . '3';
             $sheet->setCellValue($cell, $header);
-            $col++;
         }
 
         $sheet->getStyle("A3:{$lastCol}3")->applyFromArray([
-            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'DC2626']],
+            'font'      => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'DC2626']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
-            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'FFFFFF']]],
+            'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'FFFFFF']]],
         ]);
 
-        // ── Isi data ──
+        // ── Baris 4+: Isi data ──
         $row = 4;
         foreach ($data as $i => $record) {
-            $isEven = ($i % 2 === 0);
-            $bgColor = $isEven ? 'F9FAFB' : 'FFFFFF';
+            $bgColor = ($i % 2 === 0) ? 'F9FAFB' : 'FFFFFF';
 
             $sheet->setCellValue("A{$row}", $record->kabupaten_kota);
             $sheet->setCellValue("B{$row}", $record->kode_kabkota);
@@ -126,17 +121,15 @@ class Show extends Component
             $col = 4;
             foreach ($this->dataset->columns as $key => $label) {
                 $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
-                $value = $record->values[$key] ?? 0;
+                $value     = $record->values[$key] ?? 0;
                 $sheet->setCellValue("{$colLetter}{$row}", $value);
-                $sheet->getStyle("{$colLetter}{$row}")->getNumberFormat()
-                    ->setFormatCode('#,##0');
-                $sheet->getStyle("{$colLetter}{$row}")->getAlignment()
-                    ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle("{$colLetter}{$row}")->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle("{$colLetter}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 $col++;
             }
 
             $sheet->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bgColor]],
+                'fill'    => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bgColor]],
                 'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E5E7EB']]],
             ]);
 
@@ -151,81 +144,91 @@ class Show extends Component
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FEF2F2']],
         ]);
 
-        // ── Auto-width kolom ──
+        // ── Auto-width ──
         foreach (range(1, $totalCols) as $colIndex) {
             $sheet->getColumnDimensionByColumn($colIndex)->setAutoSize(true);
         }
 
-        // ── Nama file dinamis ──
-        $title = \Str::slug($this->dataset->title);
-        $parts = [$title];
-        if ($this->filterKabupaten) $parts[] = \Str::slug($this->filterKabupaten);
+        // ── Nama file ──
+        $parts = [\Str::slug($this->dataset->title)];
+        if ($this->filterKecamatan) $parts[] = \Str::slug($this->filterKecamatan);
         if ($this->filterTahun)     $parts[] = $this->filterTahun;
         $filename = implode('_', $parts) . '.xlsx';
 
         return response()->streamDownload(function () use ($spreadsheet) {
-            $writer = new Xlsx($spreadsheet);
-            $writer->save('php://output');
+            (new Xlsx($spreadsheet))->save('php://output');
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
     }
 
-    private function dispatchChartEvent()
+    // ─────────────────────────────────────────────────────────────
+    // Private helpers
+    // ─────────────────────────────────────────────────────────────
+    private function dispatchChartEvent(): void
     {
         $chartData = $this->dataset->records()
-            ->when($this->filterTahun, fn($q) => $q->where('tahun', $this->filterTahun))
-            ->when($this->filterKabupaten, fn($q) => $q->where('kabupaten_kota', $this->filterKabupaten))
+            ->when($this->filterTahun,     fn($q) => $q->where('tahun', $this->filterTahun))
+            ->when($this->filterKecamatan, fn($q) => $q->where('kabupaten_kota', $this->filterKecamatan))
             ->orderBy('nilai_utama', 'desc')
             ->limit(10)
             ->get(['kabupaten_kota', 'tahun', 'nilai_utama']);
 
         $this->dispatch('renderChart',
-            chartData: $chartData->toArray(),
-            unit: $this->dataset->unit,
-            filterTahun: $this->filterTahun,
-            filterKabupaten: $this->filterKabupaten,
+            chartData:      $chartData->toArray(),
+            unit:           $this->dataset->unit,
+            filterTahun:    $this->filterTahun,
+            filterKecamatan: $this->filterKecamatan,
         );
     }
 
-    private function dispatchMapEvent()
+    private function dispatchMapEvent(): void
     {
         $mapData = $this->dataset->records()
-            ->when($this->filterTahun, fn($q) => $q->where('tahun', $this->filterTahun))
-            ->when($this->filterKabupaten, fn($q) => $q->where('kabupaten_kota', $this->filterKabupaten))
+            ->when($this->filterTahun,     fn($q) => $q->where('tahun', $this->filterTahun))
+            ->when($this->filterKecamatan, fn($q) => $q->where('kabupaten_kota', $this->filterKecamatan))
             ->get(['kabupaten_kota', 'kode_kabkota', 'tahun', 'nilai_utama'])
             ->keyBy('kabupaten_kota')
             ->toArray();
 
         $this->dispatch('renderMap',
-            mapData: $mapData,
-            unit: $this->dataset->unit,
+            mapData:     $mapData,
+            unit:        $this->dataset->unit,
             filterTahun: $this->filterTahun,
         );
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Render
+    // ─────────────────────────────────────────────────────────────
     public function render()
     {
-        $kabupatens = $this->dataset->records()
+        // Daftar kecamatan unik untuk dropdown filter
+        $kecamatans = $this->dataset->records()
             ->select('kabupaten_kota')->distinct()
             ->whereNotNull('kabupaten_kota')
-            ->orderBy('kabupaten_kota')->pluck('kabupaten_kota');
+            ->orderBy('kabupaten_kota')
+            ->pluck('kabupaten_kota');
 
         $tahuns = $this->dataset->records()
             ->select('tahun')->distinct()
-            ->orderBy('tahun', 'desc')->pluck('tahun');
+            ->orderBy('tahun', 'desc')
+            ->pluck('tahun');
 
-        $query = $this->dataset->records();
-        if ($this->filterKabupaten) $query->where('kabupaten_kota', $this->filterKabupaten);
-        if ($this->filterTahun)     $query->where('tahun', $this->filterTahun);
-
-        $records = $query->orderBy('nilai_utama', 'desc')->paginate(10);
+        $records = $this->dataset->records()
+            ->when($this->filterKecamatan, fn($q) => $q->where('kabupaten_kota', $this->filterKecamatan))
+            ->when($this->filterTahun,     fn($q) => $q->where('tahun', $this->filterTahun))
+            ->orderBy('kabupaten_kota')
+            ->orderBy('tahun')
+            ->paginate(10);
 
         $chartData = $this->dataset->records()
-            ->when($this->filterTahun, fn($q) => $q->where('tahun', $this->filterTahun))
-            ->when($this->filterKabupaten, fn($q) => $q->where('kabupaten_kota', $this->filterKabupaten))
-            ->orderBy('nilai_utama', 'desc')->limit(10)->get();
+            ->when($this->filterTahun,     fn($q) => $q->where('tahun', $this->filterTahun))
+            ->when($this->filterKecamatan, fn($q) => $q->where('kabupaten_kota', $this->filterKecamatan))
+            ->orderBy('nilai_utama', 'desc')
+            ->limit(10)
+            ->get();
 
-        return view('livewire.datasets.show', compact('records', 'kabupatens', 'tahuns', 'chartData'));
+        return view('livewire.datasets.show', compact('records', 'kecamatans', 'tahuns', 'chartData'));
     }
 }
