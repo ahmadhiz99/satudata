@@ -40,4 +40,9 @@ class Category extends Model
     {
         return $this->hasMany(Dataset::class);
     }
+
+    public function datasetUploads()
+    {
+        return $this->hasMany(DatasetUpload::class);
+    }
 }
