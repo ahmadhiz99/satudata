@@ -16,7 +16,11 @@ class Dataset extends Model
         'description',
         'category_id',
         'organization_id',
+        'dataset_upload_id', // ← tambahan
         'columns',
+        'excel_path',        // ← tambahan
+        'can_visualize',     // ← tambahan
+        'visualize_types',
         'unit',
         'frequency',
         'start_year',
@@ -27,15 +31,16 @@ class Dataset extends Model
     ];
 
     protected $casts = [
-        'columns' => 'array',
-        'is_public' => 'boolean',
-        'published_at' => 'datetime',
+        'columns'       => 'array',
+        'is_public'     => 'boolean',
+        'can_visualize' => 'boolean',
+        'published_at'  => 'datetime',
     ];
 
     protected static function boot()
     {
         parent::boot();
-        
+
         static::creating(function ($dataset) {
             if (empty($dataset->slug)) {
                 $dataset->slug = Str::slug($dataset->title);
@@ -43,7 +48,8 @@ class Dataset extends Model
         });
     }
 
-    // Relationships
+    // ── Relationships ─────────────────────────────────────────────
+
     public function category()
     {
         return $this->belongsTo(Category::class);
@@ -59,7 +65,13 @@ class Dataset extends Model
         return $this->hasMany(DatasetRecord::class);
     }
 
-    // Scopes
+    public function upload()
+    {
+        return $this->belongsTo(DatasetUpload::class, 'dataset_upload_id');
+    }
+
+    // ── Scopes ────────────────────────────────────────────────────
+
     public function scopePublished($query)
     {
         return $query->where('status', 'published')

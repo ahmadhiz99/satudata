@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Users;
+namespace App\Livewire\Management\Users;
 
 use App\Models\User;
 use Livewire\Component;
@@ -54,7 +54,7 @@ class Index extends Component
             ->latest()
             ->paginate(10);
 
-        return view('livewire.users.index', [
+        return view('livewire.management.users.index', [
             'users' => $users
         ]);
     }

@@ -74,16 +74,7 @@
                     {{-- Filters --}}
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-red-50 p-4 rounded-lg">
                         {{-- Filter Kecamatan --}}
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Kecamatan</label>
-                            <select wire:model.live="filterKecamatan"
-                                class="w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500">
-                                <option value="">Semua Kecamatan</option>
-                                @foreach($kecamatans as $kec)
-                                    <option value="{{ $kec }}">{{ $kec }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                       
 
                         {{-- Filter Tahun --}}
                         <div>
@@ -114,7 +105,7 @@
                                 style="background-color:#16a34a;color:white;width:100%;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;">
                                 <span wire:loading.remove wire:target="downloadExcel">
                                     Download Excel
-                                    @if($filterKecamatan || $filterTahun) (Filtered) @endif
+                                    @if(isset($filterKecamatan) || $filterTahun) (Filtered) @endif
                                 </span>
                                 <span wire:loading wire:target="downloadExcel">
                                     Menyiapkan...
@@ -132,7 +123,7 @@
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-red-700 text-white">
                                         <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                                            <!-- <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                                                 Kecamatan
                                             </th>
                                             <th class="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider">
@@ -140,7 +131,7 @@
                                             </th>
                                             <th class="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider">
                                                 Tahun
-                                            </th>
+                                            </th> -->
                                             @foreach($dataset->columns as $key => $label)
                                                 <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
                                                     {{ $label }}
@@ -151,7 +142,7 @@
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         @forelse($records as $record)
                                             <tr class="hover:bg-gray-50">
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                                     {{ $record->kabupaten_kota }}
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500">
@@ -159,10 +150,10 @@
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500">
                                                     {{ $record->tahun }}
-                                                </td>
+                                                </td> -->
                                                 @foreach($dataset->columns as $key => $label)
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                                                        {{ number_format($record->values[$key] ?? 0, 0, ',', '.') }}
+                                                        {{ $record->values[$key] ?? '--' }}
                                                     </td>
                                                 @endforeach
                                             </tr>
@@ -188,9 +179,9 @@
                                     @if($filterTahun)
                                         <span class="text-sm font-normal text-gray-600">— Tahun {{ $filterTahun }}</span>
                                     @endif
-                                    @if($filterKecamatan)
+                                    <!-- @if($filterKecamatan)
                                         <span class="text-sm font-normal text-gray-600">— Kec. {{ $filterKecamatan }}</span>
-                                    @endif
+                                    @endif -->
                                 </h3>
 
                                 @if($chartData->isEmpty())

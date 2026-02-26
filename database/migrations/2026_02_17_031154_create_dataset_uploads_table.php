@@ -15,7 +15,16 @@ return new class extends Migration
             $table->foreignId('category_id')->constrained('categories')->cascadeOnDelete();
             $table->string('file_path');
             $table->string('file_name');
-            $table->unsignedBigInteger('file_size')->nullable(); // dalam bytes
+            $table->unsignedBigInteger('file_size')->nullable();
+
+            // Konfigurasi ekstraksi ke database
+            $table->boolean('extract_to_db')->default(false);
+            $table->unsignedSmallInteger('start_row')->nullable();
+            $table->string('start_col', 3)->nullable();
+
+            // Statistik
+            $table->unsignedInteger('view_count')->default(0);
+
             $table->timestamps();
         });
     }

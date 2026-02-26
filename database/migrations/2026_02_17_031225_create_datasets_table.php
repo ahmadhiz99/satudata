@@ -6,41 +6,43 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('datasets', function (Blueprint $table) {
             $table->id();
-            $table->string('title'); // Jumlah Siswa SMK Per Kabupaten/Kota
+            $table->string('title');
             $table->string('slug')->unique();
             $table->text('description')->nullable();
             $table->foreignId('category_id')->constrained()->onDelete('cascade');
             $table->foreignId('organization_id')->constrained()->onDelete('cascade');
-            
+
+            // Relasi ke file upload sumber
+            $table->foreignId('dataset_upload_id')
+                  ->nullable()
+                  ->constrained('dataset_uploads')
+                  ->nullOnDelete();
+
             // Metadata
-            $table->json('columns')->nullable(); // Kolom-kolom yang ada di dataset
-            $table->string('unit')->nullable(); // Orang, Persen, Rupiah, dll
-            $table->string('frequency')->nullable(); // Tahunan, Bulanan, dll
+            $table->json('columns')->nullable();         // {"slug": "Label Asli", ...}
+            $table->string('excel_path')->nullable();    // path file Excel (dari add_excel_path)
+            $table->boolean('can_visualize')->default(true); // dari add_excel_path
+            $table->string('visualize_types')->nullable(); // dari add_excel_path
+            $table->string('unit')->nullable();
+            $table->string('frequency')->nullable();
             $table->year('start_year')->nullable();
             $table->year('end_year')->nullable();
-            
+
             // Status & Visibility
             $table->enum('status', ['draft', 'published', 'archived'])->default('published');
             $table->boolean('is_public')->default(true);
-            
-            // Timestamps
+
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('dataset');
+        Schema::dropIfExists('datasets');
     }
 };

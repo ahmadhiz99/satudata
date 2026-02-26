@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Roles;
+namespace App\Livewire\Management\Roles;
 
 use Livewire\Component;
 use Spatie\Permission\Models\Role;
@@ -33,11 +33,11 @@ class Edit extends Component
 
         session()->flash('success', 'Role updated successfully.');
 
-        return redirect()->route('roles.index');
+        return redirect()->route('management.roles.index');
     }
 
     public function render()
     {
-        return view('livewire.roles.edit');
+        return view('livewire.management.roles.edit');
     }
 }

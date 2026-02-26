@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Roles;
+namespace App\Livewire\Management\Roles;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -54,7 +54,7 @@ class Index extends Component
             ->latest()
             ->paginate(10);
 
-        return view('livewire.roles.index', [
+        return view('livewire.management.roles.index', [
             'roles' => $roles
         ]);
     }

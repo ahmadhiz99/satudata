@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Users;
+namespace App\Livewire\Management\Users;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
@@ -41,14 +41,14 @@ class Create extends Component
 
         session()->flash('success', 'User created successfully.');
 
-        return redirect()->route('users.index');
+        return redirect()->route('management.users.index');
     }
 
     public function render()
     {
         $roles = Role::all();
 
-        return view('livewire.users.create', [
+        return view('livewire.management.users.create', [
             'roles' => $roles
         ]);
     }

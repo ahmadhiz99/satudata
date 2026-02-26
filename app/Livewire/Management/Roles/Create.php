@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Roles;
+namespace App\Livewire\Management\Roles;
 
 use Livewire\Component;
 use Spatie\Permission\Models\Role;
@@ -26,11 +26,11 @@ class Create extends Component
 
         session()->flash('success', 'Role created successfully.');
 
-        return redirect()->route('roles.index');
+        return redirect()->route('management.roles.index');
     }
 
     public function render()
     {
-        return view('livewire.roles.create');
+        return view('livewire.management.roles.create');
     }
 }

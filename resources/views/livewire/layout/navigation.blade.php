@@ -16,7 +16,8 @@ new class extends Component
     }
 }; ?>
 
-<nav x-data="{ open: false }" class="bg-white border-b border-gray-100">
+<nav x-data="{ open: false }" 
+     class="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
     <!-- Primary Navigation Menu -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
@@ -55,6 +56,12 @@ new class extends Component
                             <x-slot name="content">
                                 <x-dropdown-link :href="route('management.datasets.index')" :active="request()->routeIs('management.datasets.*')">
                                     {{ __('Datasets') }}
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('management.organizations.index')" :active="request()->routeIs('management.organizations.*')">
+                                    {{ __('Organizations') }}
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('management.categories.index')" :active="request()->routeIs('management.categories.*')">
+                                    {{ __('Categories') }}
                                 </x-dropdown-link>
                                 <x-dropdown-link :href="route('users.index')">
                                     {{ __('Users') }}
@@ -126,6 +133,12 @@ new class extends Component
                 <x-responsive-nav-link :href="route('management.datasets.index')" :active="request()->routeIs('management.datasets.*')">
                     {{ __('Datasets') }}
                 </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('management.organizations.index')" :active="request()->routeIs('management.organizations.*')">
+                    {{ __('Organizations') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('management.categories.index')" :active="request()->routeIs('management.categories.*')">
+                    {{ __('Categories') }}
+                </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
                     {{ __('Users') }}
                 </x-responsive-nav-link>
@@ -134,6 +147,5 @@ new class extends Component
                 </x-responsive-nav-link>
             </div>
         </div>
-        <!-- ... rest of responsive menu ... -->
     </div>
 </nav>

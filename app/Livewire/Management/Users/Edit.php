@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Users;
+namespace App\Livewire\Management\Users;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
@@ -53,14 +53,14 @@ class Edit extends Component
 
         session()->flash('success', 'User updated successfully.');
 
-        return redirect()->route('users.index');
+        return redirect()->route('management.users.index');
     }
 
     public function render()
     {
         $roles = Role::all();
 
-        return view('livewire.users.edit', [
+        return view('livewire.management.users.edit', [
             'roles' => $roles
         ]);
     }

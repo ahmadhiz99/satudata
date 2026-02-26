@@ -89,11 +89,17 @@
                                         </td>
                                         <td class="px-6 py-4 text-center">
                                             <div class="flex justify-center gap-3">
+                                                
                                                 {{-- Detail --}}
                                                 <a href="{{ route('management.datasets.show', $dataset->id) }}"
                                                    class="text-blue-500 hover:text-blue-700 transition"
                                                    title="Detail">
                                                     <i class="fas fa-eye"></i>
+                                                </a>
+
+                                                {{-- Edit --}}
+                                                <a href="{{ route('management.datasets.edit', $dataset->id) }}">
+                                                    <i class="fas fa-pen"></i>
                                                 </a>
 
                                                 {{-- Download --}}

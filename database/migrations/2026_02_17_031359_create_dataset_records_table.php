@@ -11,29 +11,22 @@ return new class extends Migration
         Schema::create('dataset_records', function (Blueprint $table) {
             $table->id();
             $table->foreignId('dataset_id')->constrained()->onDelete('cascade');
-            
-            // Lokasi (bisa null untuk data provinsi)
-            $table->string('kabupaten_kota')->nullable();
-            $table->string('kode_kabkota')->nullable();
-            $table->string('kecamatan')->nullable();
-            $table->string('desa')->nullable();
-            
+
             // Waktu
-            $table->year('tahun');
-            $table->string('bulan')->nullable(); // Januari, Februari, dll atau "-"
-            $table->string('satuan')->nullable(); // Orang, Persen, dll
-            
-            // Data values (flexible JSON untuk berbagai jenis data)
-            $table->json('values'); // {"siswa_smk_negeri": 408, "siswa_smk_swasta": 0, ...}
-            
-            // Nilai agregat untuk sorting/filtering
-            $table->decimal('nilai_utama', 15, 2)->nullable(); // Nilai utama untuk chart/sorting
-            
+            $table->year('tahun')->nullable();
+            $table->string('bulan')->nullable();
+            $table->string('satuan')->nullable();
+
+            // Data fleksibel dalam JSON
+            $table->json('values'); // {"nama_kolom": nilai, ...}
+
+            // Nilai agregat untuk sorting/chart
+            $table->decimal('nilai_utama', 15, 2)->nullable();
+
             $table->timestamps();
-            
+
             // Indexes
             $table->index(['dataset_id', 'tahun']);
-            $table->index(['dataset_id', 'kabupaten_kota']);
         });
     }
 

@@ -17,60 +17,71 @@ class Show extends Component
     use WithPagination;
 
     public Dataset $dataset;
-    public $activeTab    = 'tabel';
-    public $filterKecamatan = '';   // ← ganti dari filterKabupaten
-    public $filterTahun  = '';
+    public $activeTab   = 'tabel';
+    public $filterTahun = '';
+    public $search      = '';
 
-    public function mount(Dataset $dataset)
+    // Kolom yang tersedia dari dataset (diambil dari $dataset->columns)
+    // Digunakan untuk render tabel & Excel secara dinamis
+    protected $columns = [];
+
+    public function mount(Dataset $dataset): void
     {
         $this->dataset = $dataset;
     }
 
-    public function setTab($tab)
+    public function setTab(string $tab): void
     {
         $this->activeTab = $tab;
         $this->resetPage();
 
         if ($tab === 'grafik') $this->dispatchChartEvent();
-        if ($tab === 'peta')   $this->dispatchMapEvent();
     }
 
-    public function updatedFilterKecamatan()
+    public function updatedFilterTahun(): void
     {
         $this->resetPage();
         if ($this->activeTab === 'grafik') $this->dispatchChartEvent();
-        if ($this->activeTab === 'peta')   $this->dispatchMapEvent();
     }
 
-    public function updatedFilterTahun()
+    public function updatedSearch(): void
     {
         $this->resetPage();
-        if ($this->activeTab === 'grafik') $this->dispatchChartEvent();
-        if ($this->activeTab === 'peta')   $this->dispatchMapEvent();
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Download Excel (ikut filter aktif)
+    // Query dasar dengan filter aktif
+    // ─────────────────────────────────────────────────────────────
+    private function baseQuery()
+    {
+        return $this->dataset->records()
+            ->when($this->filterTahun, fn($q) => $q->where('tahun', $this->filterTahun))
+            ->when($this->search, function ($q) {
+                // Cari di semua nilai JSON values (cast ke string)
+                $q->whereRaw("LOWER(CAST(values AS TEXT)) LIKE ?", ['%' . strtolower($this->search) . '%']);
+            });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Download Excel — kolom dinamis dari dataset->columns
     // ─────────────────────────────────────────────────────────────
     public function downloadExcel(): StreamedResponse
     {
-        $data = $this->dataset->records()
-            ->when($this->filterKecamatan, fn($q) => $q->where('kabupaten_kota', $this->filterKecamatan))
-            ->when($this->filterTahun,     fn($q) => $q->where('tahun', $this->filterTahun))
-            ->orderBy('kabupaten_kota')
-            ->orderBy('tahun')
+        $columns = $this->dataset->columns ?? []; // array key slug dari header Excel
+        $data    = $this->baseQuery()
+            ->orderBy('id')
             ->get();
 
         $spreadsheet = new Spreadsheet();
         $sheet       = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Data');
 
-        $totalCols = count($this->dataset->columns) + 3; // kecamatan + kode + tahun + kolom data
+        $totalCols = count($columns) + 1; // +1 untuk kolom No
         $lastCol   = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($totalCols);
 
-        // ── Baris 1: Judul dataset ──
+        // ── Baris 1: Judul ──
         $sheet->mergeCells("A1:{$lastCol}1");
-        $sheet->setCellValue('A1', $this->dataset->title . ' — Kabupaten Barito Utara');
+        $sheet->setCellValue('A1', $this->dataset->title);
         $sheet->getStyle('A1')->applyFromArray([
             'font'      => ['bold' => true, 'size' => 14, 'color' => ['rgb' => 'FFFFFF']],
             'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'B91C1C']],
@@ -79,11 +90,7 @@ class Show extends Component
         $sheet->getRowDimension(1)->setRowHeight(28);
 
         // ── Baris 2: Info filter ──
-        $filterParts = [];
-        if ($this->filterKecamatan) $filterParts[] = 'Kecamatan: ' . $this->filterKecamatan;
-        if ($this->filterTahun)     $filterParts[] = 'Tahun: ' . $this->filterTahun;
-        $filterText = $filterParts ? implode(' | ', $filterParts) : 'Semua Kecamatan — Semua Tahun';
-
+        $filterText = $this->filterTahun ? 'Tahun: ' . $this->filterTahun : 'Semua Tahun';
         $sheet->mergeCells("A2:{$lastCol}2");
         $sheet->setCellValue('A2', $filterText);
         $sheet->getStyle('A2')->applyFromArray([
@@ -91,10 +98,12 @@ class Show extends Component
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ]);
 
-        // ── Baris 3: Header kolom ──
-        $headers = ['Kecamatan', 'Kode', 'Tahun'];
-        foreach ($this->dataset->columns as $label) {
-            $headers[] = $label . ' (' . $this->dataset->unit . ')';
+        // ── Baris 3: Header kolom — No + semua kolom dari dataset->columns ──
+        $headers = ['No'];
+        foreach ($columns as $col) {
+            // Tampilkan label yang lebih rapi (ucwords dari slug)
+            $headers[] = ucwords(str_replace('_', ' ', $col))
+                . ($this->dataset->unit ? ' (' . $this->dataset->unit . ')' : '');
         }
 
         foreach ($headers as $i => $header) {
@@ -109,22 +118,27 @@ class Show extends Component
             'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'FFFFFF']]],
         ]);
 
-        // ── Baris 4+: Isi data ──
+        // ── Baris 4+: Data dinamis dari values JSON ──
         $row = 4;
         foreach ($data as $i => $record) {
             $bgColor = ($i % 2 === 0) ? 'F9FAFB' : 'FFFFFF';
+            $values  = is_array($record->values) ? $record->values : json_decode($record->values, true);
 
-            $sheet->setCellValue("A{$row}", $record->kabupaten_kota);
-            $sheet->setCellValue("B{$row}", $record->kode_kabkota);
-            $sheet->setCellValue("C{$row}", $record->tahun);
+            $sheet->setCellValue("A{$row}", $i + 1); // No
 
-            $col = 4;
-            foreach ($this->dataset->columns as $key => $label) {
+            $col = 2;
+            foreach ($columns as $key) {
                 $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
-                $value     = $record->values[$key] ?? 0;
+                $value     = $values[$key] ?? '';
+
                 $sheet->setCellValue("{$colLetter}{$row}", $value);
-                $sheet->getStyle("{$colLetter}{$row}")->getNumberFormat()->setFormatCode('#,##0');
-                $sheet->getStyle("{$colLetter}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+                // Format angka jika numerik
+                if (is_numeric($value)) {
+                    $sheet->getStyle("{$colLetter}{$row}")->getNumberFormat()->setFormatCode('#,##0.##');
+                    $sheet->getStyle("{$colLetter}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                }
+
                 $col++;
             }
 
@@ -137,8 +151,7 @@ class Show extends Component
         }
 
         // ── Baris total ──
-        $sheet->setCellValue("A{$row}", 'TOTAL RECORDS');
-        $sheet->setCellValue("C{$row}", $data->count());
+        $sheet->setCellValue("A{$row}", 'TOTAL: ' . $data->count() . ' baris');
         $sheet->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
             'font' => ['bold' => true],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FEF2F2']],
@@ -150,9 +163,8 @@ class Show extends Component
         }
 
         // ── Nama file ──
-        $parts = [\Str::slug($this->dataset->title)];
-        if ($this->filterKecamatan) $parts[] = \Str::slug($this->filterKecamatan);
-        if ($this->filterTahun)     $parts[] = $this->filterTahun;
+        $parts    = [\Str::slug($this->dataset->title)];
+        if ($this->filterTahun) $parts[] = $this->filterTahun;
         $filename = implode('_', $parts) . '.xlsx';
 
         return response()->streamDownload(function () use ($spreadsheet) {
@@ -163,38 +175,31 @@ class Show extends Component
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Private helpers
+    // Chart — ambil nilai_utama untuk top 10
     // ─────────────────────────────────────────────────────────────
     private function dispatchChartEvent(): void
     {
-        $chartData = $this->dataset->records()
-            ->when($this->filterTahun,     fn($q) => $q->where('tahun', $this->filterTahun))
-            ->when($this->filterKecamatan, fn($q) => $q->where('kabupaten_kota', $this->filterKecamatan))
+        $columns   = $this->dataset->columns ?? [];
+        $labelKey  = $columns[0] ?? null; // kolom pertama sebagai label
+
+        $chartData = $this->baseQuery()
             ->orderBy('nilai_utama', 'desc')
             ->limit(10)
-            ->get(['kabupaten_kota', 'tahun', 'nilai_utama']);
+            ->get(['values', 'tahun', 'nilai_utama']);
+
+        // Petakan ke format [{label, value}]
+        $mapped = $chartData->map(function ($record) use ($labelKey) {
+            $values = is_array($record->values) ? $record->values : json_decode($record->values, true);
+            return [
+                'label'      => $labelKey ? ($values[$labelKey] ?? '-') : '-',
+                'nilai_utama'=> $record->nilai_utama,
+                'tahun'      => $record->tahun,
+            ];
+        });
 
         $this->dispatch('renderChart',
-            chartData:      $chartData->toArray(),
-            unit:           $this->dataset->unit,
-            filterTahun:    $this->filterTahun,
-            filterKecamatan: $this->filterKecamatan,
-        );
-    }
-
-    private function dispatchMapEvent(): void
-    {
-        $mapData = $this->dataset->records()
-            ->when($this->filterTahun,     fn($q) => $q->where('tahun', $this->filterTahun))
-            ->when($this->filterKecamatan, fn($q) => $q->where('kabupaten_kota', $this->filterKecamatan))
-            ->get(['kabupaten_kota', 'kode_kabkota', 'tahun', 'nilai_utama'])
-            ->keyBy('kabupaten_kota')
-            ->toArray();
-
-        $this->dispatch('renderMap',
-            mapData:     $mapData,
-            unit:        $this->dataset->unit,
-            filterTahun: $this->filterTahun,
+            chartData: $mapped->toArray(),
+            unit:      $this->dataset->unit,
         );
     }
 
@@ -203,32 +208,23 @@ class Show extends Component
     // ─────────────────────────────────────────────────────────────
     public function render()
     {
-        // Daftar kecamatan unik untuk dropdown filter
-        $kecamatans = $this->dataset->records()
-            ->select('kabupaten_kota')->distinct()
-            ->whereNotNull('kabupaten_kota')
-            ->orderBy('kabupaten_kota')
-            ->pluck('kabupaten_kota');
+        $columns = $this->dataset->columns ?? [];
 
         $tahuns = $this->dataset->records()
             ->select('tahun')->distinct()
+            ->whereNotNull('tahun')
             ->orderBy('tahun', 'desc')
             ->pluck('tahun');
 
-        $records = $this->dataset->records()
-            ->when($this->filterKecamatan, fn($q) => $q->where('kabupaten_kota', $this->filterKecamatan))
-            ->when($this->filterTahun,     fn($q) => $q->where('tahun', $this->filterTahun))
-            ->orderBy('kabupaten_kota')
-            ->orderBy('tahun')
-            ->paginate(10);
+        $records = $this->baseQuery()
+            ->orderBy('id')
+            ->paginate(15);
 
-        $chartData = $this->dataset->records()
-            ->when($this->filterTahun,     fn($q) => $q->where('tahun', $this->filterTahun))
-            ->when($this->filterKecamatan, fn($q) => $q->where('kabupaten_kota', $this->filterKecamatan))
+        $chartData = $this->baseQuery()
             ->orderBy('nilai_utama', 'desc')
             ->limit(10)
             ->get();
 
-        return view('livewire.datasets.show', compact('records', 'kecamatans', 'tahuns', 'chartData'));
+        return view('livewire.datasets.show', compact('records', 'tahuns', 'chartData', 'columns'));
     }
 }
